@@ -16,9 +16,10 @@ public class AccommodationController {
 
     private final AccommodationService accommodationService;
 
+    /* 숙박 시설 리스트 조회 API */
     @GetMapping("/list")
-    public List<AccommodationListResponseDto> findAll() {
-        return accommodationService.findAllAccommodations();
+    public List<AccommodationListResponseDto> getAccommodationList() {
+        return accommodationService.getAccommodationList();
     }
 
 }

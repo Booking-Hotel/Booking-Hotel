@@ -14,7 +14,7 @@ public class AccommodationService {
     private final AccommodationRepository accommodationRepository;
 
     @Transactional
-    public List<AccommodationListResponseDto> findAllAccommodations() {
+    public List<AccommodationListResponseDto> getAccommodationList() {
         return accommodationRepository.findAllWithLocation();
     }
 
