@@ -2,14 +2,20 @@ package com.hotel.booking.global.secutiry.config;
 
 
 import com.hotel.booking.global.secutiry.config.auth.PrincipleDetailsService;
+import com.hotel.booking.global.secutiry.jwt.component.JwtTokenProvider;
+import com.hotel.booking.global.secutiry.jwt.dto.JwtDTO;
+import com.hotel.booking.global.secutiry.jwt.filter.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -17,9 +23,15 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final PrincipleDetailsService principleDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public SecurityConfig(PrincipleDetailsService principleDetailsService) {
+    public SecurityConfig(PrincipleDetailsService principleDetailsService,
+        JwtAuthenticationFilter jwtAuthenticationFilter,
+        JwtTokenProvider jwtTokenProvider) {
         this.principleDetailsService = principleDetailsService;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     @Bean
@@ -28,36 +40,38 @@ public class SecurityConfig {
     }
 
     @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // Disable CSRF for this example
         http.csrf().disable();
-        // Set up access control
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
             .requestMatchers("/api/user/**").hasAnyRole("USER", "SELLER", "ADMIN")
             .requestMatchers("/api/seller/**").hasAnyRole("SELLER", "ADMIN")
             .requestMatchers("/api/admin/**").hasRole("ADMIN")
             .anyRequest().permitAll()
         );
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         http.formLogin(form -> form
             .loginPage("/loginForm")
             .loginProcessingUrl("/login")
             .successHandler((request, response, authentication) -> {
-                // Role-based redirection
-                String role = authentication.getAuthorities().iterator().next().getAuthority();
-                if (role.equals("ROLE_USER")) {
-                    response.sendRedirect("/page/main");
-                } else if (role.equals("ROLE_SELLER")) {
-                    response.sendRedirect("/page/accommodation/register");
-                } else if (role.equals("ROLE_ADMIN")) {
-                    response.sendRedirect("/page/admin");
-                }
+                String userName = authentication.getName();
+                String userRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+                JwtDTO jwtDTO = new JwtDTO(userRole, userName);
+                String token = jwtTokenProvider.generateToken(jwtDTO);
+
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"token\": \"" + token + "\", " +
+                    "\"userRole\": \"" + jwtDTO.getUserRole() + "\", " +
+                    "\"userName\": \"" + jwtDTO.getUserName() + "\"}");
+                response.getWriter().flush();
             })
             .permitAll()
-        );
-
-        // Configure exception handling
-        http.exceptionHandling(exceptionHandling -> exceptionHandling
-            .authenticationEntryPoint(authenticationEntryPoint())
         );
 
         return http.build();
