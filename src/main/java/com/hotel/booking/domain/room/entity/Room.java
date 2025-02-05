@@ -3,7 +3,6 @@ package com.hotel.booking.domain.room.entity;
 import com.hotel.booking.domain.accommodation.entity.Accommodation;
 import com.hotel.booking.global.entity.BaseEntity;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 import lombok.Data;
 
 @Entity
@@ -25,6 +24,6 @@ public class Room extends BaseEntity {
     private Integer price;
 
     @Column(nullable = false)
-    private Integer personnel;
+    private Integer people;
 }
 
