@@ -20,7 +20,7 @@ public class Role extends BaseEntity {
     @Column(nullable = false)
     private String userName;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String userPassword;
 
     @Column(nullable = false)
