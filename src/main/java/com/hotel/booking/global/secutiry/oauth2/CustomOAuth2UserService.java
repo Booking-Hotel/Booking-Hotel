@@ -4,6 +4,7 @@ import com.hotel.booking.domain.role.entity.Role;
 import com.hotel.booking.domain.role.repository.RoleRepository;
 import com.hotel.booking.domain.user.entity.User;
 import com.hotel.booking.domain.user.repository.UserRepository;
+import com.hotel.booking.global.secutiry.jwt.dto.CustomOAuth2User;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -28,25 +29,30 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     public OAuth2User loadUser(OAuth2UserRequest userRequest) {
         OAuth2User oAuth2User = super.loadUser(userRequest);
 
-        // Google 계정 정보 가져오기
         String email = oAuth2User.getAttribute("email");
         String name = oAuth2User.getAttribute("name");
 
-        // Role 테이블에 사용자 정보가 없으면 저장
+        // Role 저장
         Role role = roleRepository.findByUserName(email);
         if (role == null) {
             role = new Role();
-            role.setUserName(email);    // Google 이메일을 userName으로 사용
-            role.setUserPassword(null); // 비밀번호는 null로 설정
+            role.setUserName(email);
+            role.setUserPassword(null);
             role.setUserRole("ROLE_USER");
-            role.setStatus("1");        // 활성 상태
+            role.setStatus("1");
             roleRepository.save(role);
-            User user = new User();
-            user.setRole(role);
-            user.setName(name);
-            user.setBirth(null); // Google에서는 생년월일을 제공하지 않으므로 기본값으로 설정
-            userRepository.save(user);
         }
-        return oAuth2User;
+
+        // User 저장
+        User user = userRepository.findByRole(role);
+        if (user == null) {
+            user = new User();
+            user.setName(name);
+            user.setBirth(null); // 구글은 생일 안 줌
+            user.setRole(role);
+            user = userRepository.save(user);
+        }
+        // ✅ 사용자 정보를 CustomOAuth2User에 담아서 반환!
+        return new CustomOAuth2User(oAuth2User, role, user.getId());
     }
 }

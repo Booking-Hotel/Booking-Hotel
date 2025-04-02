@@ -11,4 +11,5 @@ import lombok.Data;
 public class JwtDTO {
     private String userRole;
     private String userName;
+    private Long userId;
 }
