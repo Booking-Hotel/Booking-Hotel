@@ -3,10 +3,12 @@ package com.hotel.booking.global.secutiry.config;
 
 import com.hotel.booking.global.secutiry.config.auth.PrincipleDetailsService;
 import com.hotel.booking.global.secutiry.jwt.component.JwtTokenProvider;
+import com.hotel.booking.global.secutiry.jwt.dto.CustomOAuth2User;
 import com.hotel.booking.global.secutiry.jwt.dto.JwtDTO;
 import com.hotel.booking.global.secutiry.jwt.filter.JwtAuthenticationFilter;
 import com.hotel.booking.global.secutiry.oauth2.CustomOAuth2UserService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -111,27 +113,34 @@ public class SecurityConfig {
         http.oauth2Login(oauth2 -> oauth2
             .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
             .successHandler((request, response, authentication) -> {
-                String email = authentication.getName();
-                String role = authentication.getAuthorities().iterator().next().getAuthority();
+                // ✅ OAuth2User에서 사용자 정보 꺼내기
+                Object principal = authentication.getPrincipal();
 
-                // JWT 생성
-                JwtDTO jwtDTO = new JwtDTO(role, email);
-                String token = jwtTokenProvider.generateToken(jwtDTO);
+                if (principal instanceof CustomOAuth2User customUser) {
+                    String userName = customUser.getRole().getUserName(); // email
+                    String userRole = customUser.getRole().getUserRole();
+                    Long userId = customUser.getUserId();
 
-                // JWT를 HttpOnly 쿠키에 저장
-                Cookie jwtCookie = new Cookie("JWT", token);
-                jwtCookie.setHttpOnly(true);
-                jwtCookie.setSecure(true); // HTTPS에서만 전송
-                jwtCookie.setPath("/");
-                jwtCookie.setMaxAge(60 * 60 * 10); // 10시간 유효
+                    JwtDTO jwtDTO = new JwtDTO(userRole, userName, userId);
+                    String token = jwtTokenProvider.generateToken(jwtDTO);
 
-                response.addCookie(jwtCookie);
+                    Cookie jwtCookie = new Cookie("JWT", token);
+                    jwtCookie.setHttpOnly(true);
+                    jwtCookie.setSecure(true);
+                    jwtCookie.setPath("/");
+                    jwtCookie.setMaxAge(60 * 60 * 10);
 
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"message\": \"Google login successful\", " +
-                    "\"userRole\": \"" + jwtDTO.getUserRole() + "\", " +
-                    "\"userName\": \"" + jwtDTO.getUserName() + "\"}");
-                response.getWriter().flush();
+                    response.addCookie(jwtCookie);
+
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"message\": \"Google login successful\", " +
+                        "\"userRole\": \"" + jwtDTO.getUserRole() + "\", " +
+                        "\"userName\": \"" + jwtDTO.getUserName() + "\", " +
+                        "\"userId\": \"" + jwtDTO.getUserId() + "\"}");
+                    response.getWriter().flush();
+                } else {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "OAuth2 로그인 사용자 정보를 가져올 수 없습니다.");
+                }
             })
             .failureUrl("/login?error")
         );
